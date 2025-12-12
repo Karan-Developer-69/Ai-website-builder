@@ -17,7 +17,8 @@ import VoiceVisualizer from './components/VoiceVisualizer';
 import CodeWorkspace from './components/CodeWorkspace';
 import ChatInterface from './components/ChatInterface';
 import ChatSidebar from './components/ChatSidebar';
-import Navigation from './components/Navigation';
+import BottomNavigation from './components/Navigation';
+import TopNavigation from './components/TopNavigation';
 import Toast from './components/Toast';
 import ProfileModal from './components/ProfileModal';
 import {
@@ -63,6 +64,7 @@ const App: React.FC = () => {
    const [showFirstTimeSetup, setShowFirstTimeSetup] = useState(false);
    const [publicUrl, setPublicUrl] = useState<string | null>(null);
    const [showPublicUrlModal, setShowPublicUrlModal] = useState(false);
+   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
 
    // -- REFS --
    const liveSession = useRef<Promise<any> | null>(null);
@@ -148,6 +150,12 @@ const App: React.FC = () => {
       const newSession: ChatSession = { id: crypto.randomUUID(), title: 'Project Alpha', messages: [], createdAt: new Date() };
       setChatSessions([newSession]);
       setCurrentSessionId(newSession.id);
+
+      // Responsive detection
+      const mediaQuery = window.matchMedia('(min-width: 768px)');
+      const handleResize = () => setIsDesktop(mediaQuery.matches);
+      mediaQuery.addEventListener('change', handleResize);
+      return () => mediaQuery.removeEventListener('change', handleResize);
    }, []);
 
    const triggerVoiceUpdate = (message: string) => {
@@ -758,6 +766,14 @@ const App: React.FC = () => {
             </div>
          )}
 
+         {/* Top Navigation for Desktop */}
+         {isDesktop && (
+            <TopNavigation
+               currentPage={currentPage}
+               onNavigate={setCurrentPage}
+               onSettingsClick={() => setIsProfileModalOpen(true)}
+            />
+         )}
 
          <div className="flex-1 relative overflow-hidden">
             <div className={`absolute inset-0 transition-opacity duration-300 ${currentPage === AppPage.WORKSPACE ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
@@ -836,7 +852,15 @@ const App: React.FC = () => {
                <VoiceVisualizer isActive={isLiveConnected} userVolume={userVolume} aiVolume={aiVolume} mode="full" />
             </div>
          </div>
-         <Navigation currentPage={currentPage} onNavigate={setCurrentPage} onSettingsClick={() => setIsProfileModalOpen(true)} />
+
+         {/* Bottom Navigation for Mobile */}
+         {!isDesktop && (
+            <BottomNavigation
+               currentPage={currentPage}
+               onNavigate={setCurrentPage}
+               onSettingsClick={() => setIsProfileModalOpen(true)}
+            />
+         )}
       </div>
    );
 };

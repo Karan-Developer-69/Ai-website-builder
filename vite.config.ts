@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  const isProd = mode === 'production';
+
   return {
     server: {
       port: 3000,
@@ -11,6 +13,25 @@ export default defineConfig(({ mode }) => {
       headers: {
         'Cross-Origin-Embedder-Policy': 'require-corp',
         'Cross-Origin-Opener-Policy': 'same-origin',
+      },
+    },
+    preview: {
+      port: 3000,
+      host: '0.0.0.0',
+      headers: {
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+      },
+    },
+    build: {
+      sourcemap: !isProd,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'webcontainer': ['@webcontainer/api'],
+          },
+        },
       },
     },
     plugins: [react()],

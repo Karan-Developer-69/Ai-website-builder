@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  --color-obsidian-800: #111111;
+  --color-obsidian-900: #0a0a0a;
+  --color-obsidian-950: #000000;
+  
+  --color-midnight-800: #1a1a1a;
+  --color-midnight-900: #141414;
+}
+
+body {
+  @apply bg-black text-white overflow-hidden h-screen w-screen antialiased;
+}
+
+#root {
+  @apply h-screen w-screen;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  @apply w-1 h-1;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full hover:bg-white/20;
+}

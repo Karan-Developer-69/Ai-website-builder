@@ -1,0 +1,7 @@
+{
+  "name": "Lysis AI",
+  "description": "A next-generation AI assistant featuring Gemini 3 Pro for deep reasoning and Gemini Live for real-time, low-latency voice interaction.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

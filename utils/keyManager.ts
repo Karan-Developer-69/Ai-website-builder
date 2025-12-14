@@ -25,6 +25,11 @@ class ApiKeyManager {
   private clientCache: Map<string, GoogleGenAI>;
   private currentContext: ApiKeyRole;
   private keyIndices: Map<ApiKeyRole, number>;
+  // Temporary emergency keys entered by user at runtime. These are kept in-memory and
+  // prepended to the list of keys for the given role while present.
+  private emergencyKeys: Map<ApiKeyRole, string | null> = new Map([
+    ['agent', null], ['worker1', null], ['worker2', null]
+  ]);
 
   constructor() {
     this.clientCache = new Map();
@@ -92,7 +97,11 @@ class ApiKeyManager {
     }
 
     const keys = this.parseKeys(keysString);
-
+    // If an emergency key is present for this role, prefer it first
+    const emergency = this.emergencyKeys.get(role);
+    if (emergency && emergency.length > 0) {
+      return [emergency, ...keys.filter(k => k !== emergency)];
+    }
     // Fallback to development keys if user hasn't configured
     if (keys.length === 0 && FALLBACK_KEYS.length > 0) {
       console.warn(`[KeyManager] No API keys configured for ${role}. Using fallback keys.`);
@@ -100,6 +109,18 @@ class ApiKeyManager {
     }
 
     return keys;
+  }
+
+  /**
+   * Set a temporary emergency API key for a specific role (not persisted).
+   * The emergency key will be used first until cleared.
+   */
+  public setEmergencyKey(role: ApiKeyRole, key: string | null): void {
+    if (key === null) this.emergencyKeys.set(role, null);
+    else this.emergencyKeys.set(role, key.trim());
+    console.log(`[KeyManager] Emergency key for ${role} set: ${key ? 'YES' : 'CLEARED'}`);
+    // Clear client cache so next getClient will construct new client with emergency key
+    this.clientCache.clear();
   }
 
   /**
@@ -242,6 +263,11 @@ class ApiKeyManager {
         } else {
           // Max retries exceeded or non-retryable error
           if (isRateLimit) {
+            // Dispatch a global event so UI can prompt user for an emergency key
+            try {
+              window.dispatchEvent(new CustomEvent('lysis-rate-limit', { detail: { role: this.currentContext, message: 'Rate limit exceeded' } }));
+            } catch (e) { /* ignore in non-browser env */ }
+
             throw new Error(`⚠️ Rate limit exceeded for ${this.currentContext}.\n\n💡 Solutions:\n1. Wait a few minutes\n2. Add more API keys (comma-separated in Settings)\n3. Use a different Google account`);
           }
           throw error;

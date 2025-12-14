@@ -28,24 +28,28 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, onSave }) 
     }
   }, [isOpen]);
 
-  const validateApiKey = (key: string): boolean => {
-    return key.startsWith('AIzaSy') && key.length >= 39;
+  const validateApiKey = (keyString: string): boolean => {
+    if (!keyString) return false;
+    // Allow comma-separated keys. Validate each individual key.
+    const parts = keyString.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    if (parts.length === 0) return false;
+    return parts.every(k => k.startsWith('AIzaSy') && k.length >= 39);
   };
 
   const handleSave = () => {
     setError('');
 
-    // Validate keys
+    // Validate keys (support comma-separated lists)
     if (!agentKey || !validateApiKey(agentKey)) {
-      setError('Agent API key is invalid. Must start with "AIzaSy" and be at least 39 characters.');
+      setError('Agent API key(s) invalid. Provide one or more keys separated by commas. Each must start with "AIzaSy" and be at least 39 characters.');
       return;
     }
     if (!worker1Key || !validateApiKey(worker1Key)) {
-      setError('Worker 1 API key is invalid. Must start with "AIzaSy" and be at least 39 characters.');
+      setError('Worker 1 API key(s) invalid. Provide one or more keys separated by commas. Each must start with "AIzaSy" and be at least 39 characters.');
       return;
     }
     if (!worker2Key || !validateApiKey(worker2Key)) {
-      setError('Worker 2 API key is invalid. Must start with "AIzaSy" and be at least 39 characters.');
+      setError('Worker 2 API key(s) invalid. Provide one or more keys separated by commas. Each must start with "AIzaSy" and be at least 39 characters.');
       return;
     }
 

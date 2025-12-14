@@ -13,6 +13,8 @@ class TaskScheduler {
   private isProcessing = false;
   private minDelayMs: number = 800; // Increased from 200ms to 800ms to avoid rate limits
   private lastExecutionTime: number = 0;
+  // Wait after receiving a response to slow down handling/processing (in ms)
+  private postDelayMs: number = 2000; // Default to 2000ms (2 seconds)
 
   /**
    * Set minimum delay between requests (in milliseconds)
@@ -21,6 +23,15 @@ class TaskScheduler {
   public setMinDelay(delayMs: number): void {
     this.minDelayMs = Math.max(100, delayMs); // Minimum 100ms
     console.log(`[Scheduler] Request throttling set to ${this.minDelayMs}ms`);
+  }
+
+  /**
+   * Set additional delay to wait AFTER a task's response arrives (in milliseconds)
+   * Useful to intentionally slow down processing or give UI time to show results.
+   */
+  public setPostDelay(delayMs: number): void {
+    this.postDelayMs = Math.max(0, delayMs);
+    console.log(`[Scheduler] Post-request delay set to ${this.postDelayMs}ms`);
   }
 
   public enqueue(execute: () => Promise<any>, priority: number = 5): Promise<any> {
@@ -65,6 +76,12 @@ class TaskScheduler {
 
         await task.execute();
         this.lastExecutionTime = Date.now();
+
+        // Optional post-request delay: wait a bit after handling response
+        if (this.postDelayMs > 0) {
+          console.log(`[Scheduler] Waiting ${this.postDelayMs}ms after response to slow processing`);
+          await new Promise((r) => setTimeout(r, this.postDelayMs));
+        }
       } catch (error: any) {
         // NOTE: App.tsx handles the key rotation inside executeWithRetry.
         // If an error still bubbles up here, it means all keys failed or it's non-retriable.

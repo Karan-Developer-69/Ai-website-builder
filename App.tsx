@@ -32,6 +32,8 @@ import { keyManager } from './utils/keyManager';
 import { ngrokService } from './utils/ngrokService';
 import { Terminal as XTerminal } from 'xterm';
 
+type ApiKeyRole = 'agent' | 'worker1' | 'worker2';
+
 const App: React.FC = () => {
    // -- STATE --
    const [currentPage, setCurrentPage] = useState<AppPage>(AppPage.WORKSPACE);
@@ -65,6 +67,12 @@ const App: React.FC = () => {
    const [publicUrl, setPublicUrl] = useState<string | null>(null);
    const [showPublicUrlModal, setShowPublicUrlModal] = useState(false);
    const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+      // Emergency rate-limit handling
+      const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
+      const [emergencyRole, setEmergencyRole] = useState<ApiKeyRole | null>(null);
+      const emergencyResumeFn = useRef<(() => Promise<void>) | null>(null);
+      const [emergencyInput, setEmergencyInput] = useState('');
+      const [isEmergencySubmitting, setIsEmergencySubmitting] = useState(false);
 
    // -- REFS --
    const liveSession = useRef<Promise<any> | null>(null);
@@ -199,7 +207,8 @@ const App: React.FC = () => {
       }));
       logWorker(workerId, `Assigned: ${taskDescription}`, 'info');
 
-      const targetTerm = workerId === 'worker1' ? 'CLIENT' : 'SERVER';
+   const targetTerm = workerId === 'worker1' ? 'CLIENT' : 'SERVER';
+   const workerRoleBefore = workerId === 'worker1' ? 'worker1' : 'worker2';
       writeToTerminal(`\r\n\x1b[35m[${workerId.toUpperCase()}] Started: ${taskDescription}\x1b[0m`, targetTerm);
       triggerVoiceUpdate(`${workerId} started: ${taskDescription}`);
 
@@ -207,6 +216,7 @@ const App: React.FC = () => {
          try {
             // Set keyManager context based on worker
             const workerRole = workerId === 'worker1' ? 'worker1' : 'worker2';
+            // Pass the role to executeWithRetry so the correct API key set is used for this worker
             await keyManager.executeWithRetry(async (client) => {
                // CRITICAL: Inject instructions based on environment
                const isWorker1 = workerId === 'worker1';
@@ -408,7 +418,7 @@ const App: React.FC = () => {
                   const parts = toolResponses.map(tr => ({ functionResponse: tr }));
                   result = await chat.sendMessage({ message: parts });
                }
-            });
+            }, undefined, workerRole);
 
             setWorkers(prev => ({
                ...prev, [workerId]: { ...prev[workerId], isBusy: false, currentTask: 'Idle', progress: 100 }
@@ -418,6 +428,16 @@ const App: React.FC = () => {
 
          } catch (error: any) {
             console.error(`Worker ${workerId} failed`, error);
+            const msg = error?.message || '';
+            if (msg.includes('Rate limit') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Rate limit exceeded') || msg.includes('⚠️ Rate limit')) {
+               // Offer emergency key and resume
+               setEmergencyRole(workerRoleBefore as ApiKeyRole);
+               emergencyResumeFn.current = async () => {
+                  await executeWorkerTask(workerId, taskDescription);
+               };
+               setEmergencyModalOpen(true);
+               return;
+            }
             logWorker(workerId, `Error: ${error.message}`, 'error');
             setWorkers(prev => ({
                ...prev, [workerId]: { ...prev[workerId], isBusy: false, currentTask: 'Error', progress: 0 }
@@ -555,8 +575,19 @@ const App: React.FC = () => {
                      toolCalls = [];
                   }
                }
-            });
+            }, undefined, 'agent');
          } catch (err: any) {
+            // If this is a rate limit error, show emergency modal to accept a temporary API key
+            const msg = err?.message || '';
+            if (msg.includes('Rate limit') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Rate limit exceeded') || msg.includes('⚠️ Rate limit')) {
+               setEmergencyRole('agent');
+               emergencyResumeFn.current = async () => {
+                  // Retry sending the same message
+                  await handleUserMessage(text);
+               };
+               setEmergencyModalOpen(true);
+               return;
+            }
             addToast('error', 'Agent Error', err.message);
          } finally {
             clearTimeout(safetyTimeout);
@@ -694,6 +725,51 @@ const App: React.FC = () => {
       }
    };
 
+   const startDevServer = async () => {
+      if (workspace.previewUrl) {
+         addToast('info', 'Preview', 'App is already running');
+         setWorkspace(prev => ({ ...prev, activeTab: 'PREVIEW' }));
+         return;
+      }
+
+      try {
+         // Try to detect package.json in workspace files to run dev from correct directory
+         const pkgPath = Object.keys(workspace.files || {}).find(p => p.endsWith('package.json')) || null;
+         let cmd = 'npm run dev';
+         if (pkgPath) {
+            const dir = pkgPath.includes('/') ? pkgPath.split('/').slice(0, -1).join('/') : '.';
+            if (dir && dir !== '.') cmd = `cd ${dir} && npm run dev`;
+         } else {
+            // No package.json found — inform the user instead of spawning which will fail
+            addToast('error', 'Start Failed', 'No package.json found in workspace. Create a package.json or open the correct project folder.');
+            return;
+         }
+
+         const container = await getWebContainer();
+         const process = await container.spawn('jsh', ['-c', cmd]);
+
+         const pid = Date.now().toString();
+         activeProcesses.current[pid] = process;
+
+         const terminalToUse = clientTerminalRef.current;
+
+         process.output.pipeTo(new WritableStream({
+            write(data) {
+               if (terminalToUse) terminalToUse.write(data);
+            }
+         } as any));
+
+         container.on('server-ready', (port: number, url: string) => {
+            setWorkspace(prev => ({ ...prev, previewUrl: url, activeTab: 'PREVIEW' }));
+            addToast('success', 'Deployed', `App live at ${url}`);
+         });
+
+         addToast('loading', 'Starting', 'Starting dev server...');
+      } catch (err: any) {
+         addToast('error', 'Start Failed', err.message || String(err));
+      }
+   };
+
    return (
       <div className="flex flex-col h-screen bg-black text-white font-sans overflow-hidden">
          <Toast toasts={toasts} removeToast={removeToast} />
@@ -706,6 +782,50 @@ const App: React.FC = () => {
             }}
             onSave={handleProfileSave}
          />
+
+         {/* Emergency Rate Limit Modal */}
+         {emergencyModalOpen && (
+            <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+               <div className="w-full max-w-md p-6 bg-gradient-to-br from-gray-900 to-black border border-red-500/30 rounded-2xl">
+                  <div className="flex items-center justify-between mb-4">
+                     <h3 className="text-lg font-bold">Rate Limit Reached</h3>
+                     <button onClick={() => { setEmergencyModalOpen(false); setEmergencyInput(''); }} className="p-2">✕</button>
+                  </div>
+                  <p className="text-sm text-gray-300 mb-3">The selected API key set has hit rate limits. You can enter a temporary (emergency) API key to continue processing immediately.</p>
+                  <input
+                     type="text"
+                     value={emergencyInput}
+                     onChange={(e) => setEmergencyInput(e.target.value)}
+                     placeholder="Enter emergency API key (starts with AIzaSy...)"
+                     className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white mb-3"
+                  />
+                  <div className="flex gap-3 justify-end">
+                     <button onClick={() => { setEmergencyModalOpen(false); setEmergencyInput(''); }} className="px-3 py-2 rounded bg-white/5">Cancel</button>
+                     <button
+                        onClick={async () => {
+                           if (!emergencyRole) return;
+                           setIsEmergencySubmitting(true);
+                           try {
+                              keyManager.setEmergencyKey(emergencyRole, emergencyInput);
+                              setEmergencyModalOpen(false);
+                              // Wait a tick then resume
+                              await new Promise(r => setTimeout(r, 200));
+                              if (emergencyResumeFn.current) await emergencyResumeFn.current();
+                           } catch (e: any) {
+                              addToast('error', 'Resume Failed', e?.message || String(e));
+                           } finally {
+                              setIsEmergencySubmitting(false);
+                              setEmergencyInput('');
+                           }
+                        }}
+                        className="px-3 py-2 rounded bg-cyan-500 text-white font-semibold"
+                     >
+                        {isEmergencySubmitting ? 'Resuming...' : 'Resume'}
+                     </button>
+                  </div>
+               </div>
+            </div>
+         )}
 
          {/* Public URL Modal */}
          {showPublicUrlModal && publicUrl && (
@@ -787,6 +907,7 @@ const App: React.FC = () => {
                   onTerminalInput={handleTerminalInput}
                   onSelectFile={handleFileSelect}
                   onCreateLiveSite={handleCreateLiveSite}
+                  onRunApp={startDevServer}
                />
             </div>
 

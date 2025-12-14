@@ -20,6 +20,7 @@ interface CodeWorkspaceProps {
    onTerminalInput?: (data: string, source: 'CLIENT' | 'SERVER') => void;
    onSelectFile: (path: string) => void;
    onCreateLiveSite?: () => void;
+   onRunApp?: () => void;
 }
 
 const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
@@ -32,7 +33,9 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
    onTerminalInput,
    onSelectFile,
    onCreateLiveSite
+      , onRunApp
 }) => {
+       const iframeRef = React.useRef<HTMLIFrameElement | null>(null);
    const [activeTerminalTab, setActiveTerminalTab] = React.useState<'CLIENT' | 'SERVER'>('CLIENT');
 
    // Identify Active Worker
@@ -230,7 +233,7 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
                         <div className="flex-1 bg-white h-5 rounded border border-gray-300 flex items-center px-2 text-[10px] text-gray-500 font-mono truncate">
                            {workspace.previewUrl || 'localhost:5173'}
                         </div>
-                        {workspace.previewUrl && (
+                        {workspace.previewUrl ? (
                            <>
                               <button
                                  onClick={onCreateLiveSite}
@@ -247,6 +250,29 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
                               >
                                  <ExternalLink className="w-3 h-3" />
                               </button>
+                              <button
+                                 onClick={() => {
+                                    const el = iframeRef.current;
+                                    if (!el) return;
+                                    if ((el as any).requestFullscreen) (el as any).requestFullscreen();
+                                    else if ((el as any).webkitRequestFullscreen) (el as any).webkitRequestFullscreen();
+                                 }}
+                                 className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
+                                 title="Fullscreen Preview"
+                              >
+                                 <Layout className="w-3 h-3" />
+                              </button>
+                           </>
+                        ) : (
+                           <>
+                              <button
+                                 onClick={() => onRunApp && onRunApp()}
+                                 className="px-3 py-1 text-[10px] font-semibold tracking-wide bg-green-600 text-white rounded hover:opacity-90 transition-all flex items-center gap-2"
+                                 title="Run the app (start dev server)"
+                              >
+                                 <Loader2 className="w-3 h-3 animate-spin" />
+                                 RUN APP
+                              </button>
                            </>
                         )}
                      </div>
@@ -254,6 +280,7 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
                      <div className="flex-1 relative">
                         {workspace.previewUrl ? (
                            <iframe
+                              ref={iframeRef}
                               src={workspace.previewUrl}
                               className="w-full h-full border-none bg-white"
                               allow="cross-origin-isolated; clipboard-read; clipboard-write"

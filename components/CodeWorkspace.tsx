@@ -35,6 +35,7 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
    onCreateLiveSite
       , onRunApp
 }) => {
+   const [showExplorer, setShowExplorer] = React.useState(true);
        const iframeRef = React.useRef<HTMLIFrameElement | null>(null);
    const [activeTerminalTab, setActiveTerminalTab] = React.useState<'CLIENT' | 'SERVER'>('CLIENT');
 
@@ -101,11 +102,11 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
    return (
       <div className="w-full h-full bg-transparent flex flex-col overflow-hidden border-t border-white/10">
 
-         {/* MAIN CONTENT AREA (3 Columns) */}
-         <div className="flex-1 flex overflow-hidden">
+         {/* MAIN CONTENT AREA (3 Columns) - responsive grid for mobile */}
+         <div className="flex-1 grid grid-cols-1 md:grid-cols-[18rem_1fr_20rem] overflow-hidden">
 
             {/* COL 1: EXPLORER */}
-            <div className="w-72 flex flex-col border-r border-white/10 bg-obsidian-900/60 backdrop-blur-md">
+            <div className={`${showExplorer ? 'flex' : 'hidden'} md:flex flex-col border-r border-white/10 bg-obsidian-900/60 backdrop-blur-md`}>
                <div className="h-11 flex items-center px-4 border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-400 tracking-wider">
                   <span className="text-gray-400 font-bold text-[10px] tracking-widest flex items-center gap-2">
                      <Layout className="w-3 h-3" /> EXPLORER
@@ -127,10 +128,19 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
             </div>
 
             {/* COL 2: EDITOR */}
-            <div className="flex-1 flex flex-col border-r border-white/10 bg-black min-w-0 relative">
+            <div className="flex-1 flex flex-col border-white/10 bg-black min-w-0 min-h-0 relative md:border-r">
                {/* Editor Header */}
                <div className="h-10 flex items-center justify-between px-4 border-b border-white/5 backdrop-blur-sm bg-obsidian-900/80">
                   <div className="flex items-center gap-2 text-white text-xs font-mono">
+                     {/* Explorer toggle for small screens */}
+                     <button
+                        onClick={() => setShowExplorer(s => !s)}
+                        className="md:hidden p-1 mr-1 rounded hover:bg-white/5 transition-colors"
+                        aria-label={showExplorer ? 'Hide Explorer' : 'Show Explorer'}
+                        title={showExplorer ? 'Hide Explorer' : 'Show Explorer'}
+                     >
+                        <Layout className="w-4 h-4 text-gray-300" />
+                     </button>
                      <Code className="w-3.5 h-3.5 text-white" />
                      <span>{workspace.activeFile || 'Welcome'}</span>
                   </div>
@@ -169,7 +179,7 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
             </div>
 
             {/* COL 3: PREVIEW / TERMINAL */}
-            <div className="w-[500px] flex flex-col bg-black border-l border-white/10 shrink-0">
+            <div className="flex flex-col bg-black border-l border-white/10 shrink-0 md:col-start-3 md:col-end-4 md:w-auto w-full">
                {/* Tabs */}
                <div className="h-10 flex border-b border-white/5 bg-obsidian-900">
                   <button
@@ -282,7 +292,7 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
                            <iframe
                               ref={iframeRef}
                               src={workspace.previewUrl}
-                              className="w-full h-full border-none bg-white"
+                              className="w-full h-full min-h-[320px] border-none bg-white"
                               allow="cross-origin-isolated; clipboard-read; clipboard-write"
                               sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
                            />
@@ -301,7 +311,7 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
          </div>
 
          {/* STATUS BAR (Bottom) */}
-         <div className="h-8 bg-black border-t border-white/10 flex items-center justify-between px-4 select-none z-20 shrink-0 relative text-[11px] tracking-wider text-gray-400">
+         <div className="h-8 bg-black border-t border-white/10 flex items-center justify-between px-3 md:px-4 select-none z-20 shrink-0 relative text-[11px] md:text-[11px] tracking-wider text-gray-400">
             {/* Background Progress Bar */}
             {activeWorker && (
                <div

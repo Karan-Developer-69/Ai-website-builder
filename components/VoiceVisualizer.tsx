@@ -14,7 +14,14 @@ const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isActive, userVolume,
   // MINI MODE (For Chat/Nav Bar)
   if (mode === 'mini') {
     return (
-      <div className="relative w-8 h-8 flex items-center justify-center" style={{ position: 'relative', width: '2rem', height: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        className="relative w-8 h-8 flex items-center justify-center"
+        style={{ position: 'relative', width: '2rem', height: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        role="img"
+        aria-label={isActive ? 'Voice active' : 'Voice inactive'}
+        title={isActive ? 'Voice active' : 'Voice inactive'}
+        tabIndex={0}
+      >
         {/* Glow */}
         <motion.div
           className="absolute inset-0 rounded-full blur-md"
@@ -26,7 +33,7 @@ const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isActive, userVolume,
         />
         {/* Core */}
         <motion.div
-          className={`relative w-6 h-6 rounded-full border shadow-inner flex items-center justify-center overflow-hidden`}
+          className={`relative w-6 h-6 rounded-full border shadow-inner flex items-center justify-center overflow-hidden ${isActive ? 'ring-2 ring-cyan-400/30' : 'ring-0'}`}
           animate={{
             scale: isActive ? 1 + (aiVolume * 0.2) : 1,
           }}

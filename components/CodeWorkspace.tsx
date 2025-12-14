@@ -35,7 +35,18 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
    onCreateLiveSite
       , onRunApp
 }) => {
-   const [showExplorer, setShowExplorer] = React.useState(true);
+       const [showExplorer, setShowExplorer] = React.useState(true);
+       // Auto-collapse explorer on very small screens and keep responsive behavior
+       React.useEffect(() => {
+          const handleResize = () => {
+             // Collapse automatically for extra-small devices (<=420px)
+             if (window.innerWidth <= 420) setShowExplorer(false);
+             else setShowExplorer(true);
+          };
+          handleResize();
+          window.addEventListener('resize', handleResize);
+          return () => window.removeEventListener('resize', handleResize);
+       }, []);
        const iframeRef = React.useRef<HTMLIFrameElement | null>(null);
    const [activeTerminalTab, setActiveTerminalTab] = React.useState<'CLIENT' | 'SERVER'>('CLIENT');
 
@@ -307,6 +318,17 @@ const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({
                   </div>
                </div>
             </div>
+
+            {/* Floating explorer toggle for very small screens (when hidden) */}
+            {!showExplorer && (
+               <button
+                  onClick={() => setShowExplorer(true)}
+                  className="fixed bottom-4 right-4 z-40 md:hidden bg-cyan-500 text-white p-3 rounded-full shadow-lg hover:scale-105 transition-transform"
+                  title="Show Explorer"
+               >
+                  <Layout className="w-5 h-5" />
+               </button>
+            )}
 
          </div>
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, X, ExternalLink } from 'lucide-react';
+import { Globe, X, ExternalLink, Activity } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality, Content, Part } from '@google/genai';
 import {
    AppPage,
@@ -937,8 +937,31 @@ const App: React.FC = () => {
                         <div className="w-5 h-0.5 bg-gray-400"></div>
                      </button>
                      <span className="font-mono text-sm tracking-widest text-cyan-400">COMMAND CENTER</span>
-                     <div className="w-8 h-8">
-                        <VoiceVisualizer isActive={isLiveConnected} userVolume={userVolume} aiVolume={aiVolume} mode="mini" />
+                     <div className="flex items-center gap-2">
+                        <div className="w-8 h-8">
+                           <VoiceVisualizer isActive={isLiveConnected} userVolume={userVolume} aiVolume={aiVolume} mode="mini" />
+                        </div>
+                        <div className="hidden sm:flex items-center gap-2">
+                           {isLiveConnected ? (
+                              <div className="px-2 py-0.5 bg-green-600 text-white rounded-full text-xs font-semibold">LIVE</div>
+                           ) : (
+                              <button
+                                 onClick={() => startLiveSession(false)}
+                                 className="px-2 py-0.5 bg-yellow-600 text-white rounded-full text-xs font-semibold"
+                              >
+                                 CONNECT
+                              </button>
+                           )}
+                        </div>
+                        <div className="sm:hidden">
+                           <button
+                              onClick={() => (isLiveConnected ? stopLiveSession() : startLiveSession(false))}
+                              className="p-1 rounded hover:bg-white/5"
+                              title={isLiveConnected ? 'Terminate Link' : 'Establish Link'}
+                           >
+                              <Activity className="w-4 h-4 text-gray-300" />
+                           </button>
+                        </div>
                      </div>
                   </div>
                   <ChatInterface messages={chatSessions.find(s => s.id === currentSessionId)?.messages || []} workers={workers} isLoading={isAgentProcessing} />
